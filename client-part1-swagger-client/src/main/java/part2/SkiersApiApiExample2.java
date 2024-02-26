@@ -13,9 +13,9 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class SkiersApiApiExample2 {
-    private static final int TOTAL_THREADS = 40; // can adjust # threads
+    private static final int TOTAL_THREADS = 1; // can adjust # threads
     private static final CountDownLatch countdownlatch = new CountDownLatch(TOTAL_THREADS);
-    private static final int requests = 200000;
+    private static final int requests = 1;
     private static final int qSize = 160;
     private static final BlockingQueue<LiftRideEvent> q = new LinkedBlockingQueue<>(qSize);
 
@@ -55,63 +55,58 @@ public class SkiersApiApiExample2 {
                         try {
                             LiftRideEvent ride = q.take();
                             ApiClient client = new ApiClient();
-                            client.setBasePath("http://localhost:8080/skiResort");
-                            //client.setBasePath("http://54.185.240.211:8080/skiResort_war");
+                            //client.setBasePath("http://localhost:8080/skiResort");
+                            client.setBasePath("http://54.185.240.211:8080/skiResort_war");
                             SkiersApi apiInstance = new SkiersApi(client);
                             LiftRide body = new LiftRide(); // skiers post request body: liftID, time
                             FileWriter writer = new FileWriter("Output.csv");
                             for (int j = 0; j < requests; j++) {
+                                int retries = 0;
+                                boolean success = false;
+                                while (retries < 5 && !success) {
+                                    body.setLiftID(ride.getLiftID());
+                                    body.setTime(ride.getTime());
 
-                                body.setLiftID(ride.getLiftID());
-                                body.setTime(ride.getTime());
-                                try {
-                                    long eachRequestStartTime = System.currentTimeMillis();
+                                    try {
+                                        long eachRequestStartTime = System.currentTimeMillis();
 
-                                    ApiResponse<Void> response = apiInstance.writeNewLiftRideWithHttpInfo(body, ride.getResortID(), Integer.toString(ride.getSeasonID()),
-                                            Integer.toString(ride.getDayID()), ride.getSkierID());
-                                    int statusCode = response.getStatusCode();
-                                    //System.out.println(statusCode);
-//                                    if (statusCode != 200) {
-//                                        for (int k =0; k < 5; k++) {
-//                                            response = apiInstance.writeNewLiftRideWithHttpInfo(body, ride.getResortID(), Integer.toString(ride.getSeasonID()),
-//                                                    Integer.toString(ride.getDayID()), ride.getSkierID());
-//                                            if (response.getStatusCode() == 200) {
-//                                                statusCode = response.getStatusCode();
-//                                                break;
-//                                            }
-//                                        }
-//                                        if (statusCode != 200) {
-//                                            unsuccessfulRequests.incrementAndGet();
-//                                        }
-//                                    }
-                                    long eachRequestEndTime = System.currentTimeMillis();
+                                        ApiResponse<Void> response = apiInstance.writeNewLiftRideWithHttpInfo(body, ride.getResortID(), Integer.toString(ride.getSeasonID()),
+                                                Integer.toString(ride.getDayID()), ride.getSkierID());
+                                        int statusCode = response.getStatusCode();
 
-                                    long latency = eachRequestEndTime - eachRequestStartTime;
+                                        long eachRequestEndTime = System.currentTimeMillis();
 
-                                    writer.append(String.valueOf(eachRequestStartTime))
-                                            .append(",")
-                                            .append("POST")
-                                            .append(",")
-                                            .append(String.valueOf(latency)) // milliseconds
-                                            .append(",")
-                                            .append(String.valueOf(statusCode))
-                                            .append("\n");
+                                        long latency = eachRequestEndTime - eachRequestStartTime;
 
-                                    countdownlatch.countDown();
-//                                    System.out.println("Thread " + Thread.currentThread().getId() +
-//                                            " - Request " + (j + 1) + " completed successfully.");
-                                    requestsCount ++;
+                                        writer.append(String.valueOf(eachRequestStartTime))
+                                                .append(",")
+                                                .append("POST")
+                                                .append(",")
+                                                .append(String.valueOf(latency)) // milliseconds
+                                                .append(",")
+                                                .append(String.valueOf(statusCode))
+                                                .append("\n");
 
-                                } catch (ApiException e) {
-                                    System.err.println("Exception when calling SkiersApi#POST request");
-                                    unsuccessfulRequests.incrementAndGet();
-                                    e.printStackTrace();
+                                        countdownlatch.countDown();
+                                        //                                    System.out.println("Thread " + Thread.currentThread().getId() +
+                                        //                                            " - Request " + (j + 1) + " completed successfully.");
+                                        requestsCount++;
+                                        success = true;
+
+                                    } catch (ApiException e) {
+                                        System.err.println("Exception when calling SkiersApi#POST request");
+                                        retries ++;
+                                        if (retries == 5) {
+                                            unsuccessfulRequests.incrementAndGet();
+                                            break;
+                                        }
+                                    }
                                 }
                             }
                             writer.close();
-                        } catch (InterruptedException | IOException e) {
-                            throw new RuntimeException(e);
-                        }
+                            } catch(InterruptedException | IOException e){
+                                throw new RuntimeException(e);
+                            }
                     }
                 }
             });
@@ -123,7 +118,7 @@ public class SkiersApiApiExample2 {
             generationService.shutdown();
             executorService.shutdown();
             // Wait for all threads to terminate with a specified timeout 10000request :20sec
-            boolean terminated = executorService.awaitTermination(300, TimeUnit.SECONDS);
+            boolean terminated = executorService.awaitTermination(10, TimeUnit.SECONDS);
             if (!terminated) {
                 System.out.println("ExecutorService did not terminate within the specified timeout.");
             }
@@ -165,7 +160,7 @@ public class SkiersApiApiExample2 {
             System.out.println("mean response time (millisecs): " + latencySum / requests);
             System.out.println("median response time (millisecs): " + median );
             System.out.println("Total throughput in requests per second: " + ((requests) / (runTime / 1000.0)));
-            System.out.println("p99 (99th percentile response time (millisecs)): " + latencies.get(index - 1));
+            System.out.println("p99 (99th percentile response time (millisecs)): " + latencies.get(index));
             System.out.println("min and max response time (millisecs): " + latencies.get(0) + " " + latencies.get(n - 1));
 
         } catch (InterruptedException e) {

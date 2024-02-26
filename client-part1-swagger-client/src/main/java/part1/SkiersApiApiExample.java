@@ -7,10 +7,10 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class SkiersApiApiExample {
-    private static final int TOTAL_THREADS = 40; // can adjust # threads
+    private static final int TOTAL_THREADS = 100; // can adjust # threads
     private static final CountDownLatch countdownlatch = new CountDownLatch(TOTAL_THREADS);
     private static final int requests = 10000;
-    private static final int qSize = 130;
+    private static final int qSize = 2000;
     private static final BlockingQueue<LiftRideEvent> q = new LinkedBlockingQueue<>(qSize);
 
     public static void main(String[] args) {
@@ -26,7 +26,6 @@ public class SkiersApiApiExample {
                             generateRandomNumber(1, 40), generateRandomNumber(1, 360));
                     try {
                         q.put(ride);
-                        // System.out.println(ride.toString());
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
                     }
@@ -54,44 +53,26 @@ public class SkiersApiApiExample {
                             //client.setBasePath("http://54.185.240.211:8080/skiResort_war");
                             SkiersApi apiInstance = new SkiersApi(client);
                             LiftRide body = new LiftRide(); // skiers post request body: liftID, time
-                            for (int j = 0; j < requests; j++) {
-                                //long eachRequestStartTime = System.currentTimeMillis();
+                            //for (int j = 0; j < requests; j++) {
 
-                                body.setLiftID(ride.getLiftID());
-                                body.setTime(ride.getTime());
-                                try {
+                            body.setLiftID(ride.getLiftID());
+                            body.setTime(ride.getTime());
+                            try {
+                                ApiResponse<Void> response = apiInstance.writeNewLiftRideWithHttpInfo(body, ride.getResortID(), Integer.toString(ride.getSeasonID()),
+                                        Integer.toString(ride.getDayID()), ride.getSkierID());
 
-//                                    apiInstance.writeNewLiftRide(body, ride.getResortID(), Integer.toString(ride.getSeasonID()),
-//                                            Integer.toString(ride.getDayID()), ride.getSkierID());
-                                    ApiResponse<Void> response = apiInstance.writeNewLiftRideWithHttpInfo(body, ride.getResortID(), Integer.toString(ride.getSeasonID()),
-                                            Integer.toString(ride.getDayID()), ride.getSkierID());
-                                    int statusCode = response.getStatusCode();
-                                    //System.out.println(statusCode);
-//                                    if (statusCode != 200) {
-//                                        for (int k =0; k < 5; k++) {
-//                                            response = apiInstance.writeNewLiftRideWithHttpInfo(body, ride.getResortID(), Integer.toString(ride.getSeasonID()),
-//                                                    Integer.toString(ride.getDayID()), ride.getSkierID());
-//                                            if (response.getStatusCode() == 200) {
-//                                                statusCode = response.getStatusCode();
-//                                                break;
-//                                            }
-//                                        }
-//                                        if (statusCode != 200) {
-//                                            unsuccessfulRequests.incrementAndGet();
-//                                        }
-//                                    }
-                                    //long eachRequestEndTime = System.currentTimeMillis();
-                                    //long latency = eachRequestEndTime - eachRequestStartTime;
-                                    countdownlatch.countDown();
+                                countdownlatch.countDown();
+                                System.out.println("Thread " + Thread.currentThread().getId() + " completed successfully.");
 
-                                    requestsCount ++;
+                                requestsCount ++;
 
-                                } catch (ApiException e) {
-                                    System.err.println("Exception when calling SkiersApi#POST request");
-                                    unsuccessfulRequests.incrementAndGet();
-                                    e.printStackTrace();
-                                }
+                            } catch (ApiException e) {
+                                System.err.println("Exception when calling SkiersApi#POST request");
+                                unsuccessfulRequests.incrementAndGet();
+                                e.printStackTrace();
                             }
+                            // }
+
                         } catch (InterruptedException e) {
                             throw new RuntimeException(e);
                         }
@@ -104,11 +85,22 @@ public class SkiersApiApiExample {
             // Wait for all threads to complete their requests
             countdownlatch.await();
             generationService.shutdown();
+            boolean t1 = generationService.awaitTermination(20, TimeUnit.SECONDS);
             executorService.shutdown();
+            boolean t2 = executorService.awaitTermination(20, TimeUnit.SECONDS);
+            if (!t1) {
+                System.out.println("t1 shutdown problem");
+            }
+            if (!t2) {
+                System.out.println("t2 shutdown problem");
+            }
             // Wait for all threads to terminate with a specified timeout 10000request :20sec
-            boolean terminated = executorService.awaitTermination(300, TimeUnit.SECONDS);
-            if (!terminated) {
-                System.out.println("ExecutorService did not terminate within the specified timeout.");
+            //boolean terminated = executorService.awaitTermination(20, TimeUnit.SECONDS);
+//            if (!terminated) {
+//                System.out.println("ExecutorService did not terminate within the specified timeout.");
+//            }
+            if (!executorService.isTerminated()) {
+                System.out.println("Some threads in executorService did not terminate.");
             }
 
             long endTime = System.currentTimeMillis();
