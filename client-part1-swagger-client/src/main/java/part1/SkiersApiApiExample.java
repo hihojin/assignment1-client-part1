@@ -7,10 +7,15 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class SkiersApiApiExample {
-    private static final int TOTAL_THREADS = 100; // can adjust # threads
+
+    // Total requests = Number of threads × Requests per thread
+    //= 100 × 2000
+    //= 200,000
+
+    private static final int TOTAL_THREADS = 100;
     private static final CountDownLatch countdownlatch = new CountDownLatch(TOTAL_THREADS);
-    private static final int requests = 10000;
-    private static final int qSize = 2000;
+    private static final int requests = 2000;
+    private static final int qSize = 200000;
     private static final BlockingQueue<LiftRideEvent> q = new LinkedBlockingQueue<>(qSize);
 
     public static void main(String[] args) {
@@ -43,15 +48,15 @@ public class SkiersApiApiExample {
                 @Override
                 public void run() {
 
-                    int requestsCount = 0;
-
-                    while (requestsCount < requests) {
+                    //int requestsCount = 0;
+                    ApiClient client = new ApiClient();
+                    client.setBasePath("http://localhost:8080/skiResort");
+                    //client.setBasePath("http://54.185.240.211:8080/skiResort_war");
+                    SkiersApi apiInstance = new SkiersApi(client);
+                    for (int j = 0; j < requests; j++) {
+                    //while (requestsCount < requests) {
                         try {
                             LiftRideEvent ride = q.take();
-                            ApiClient client = new ApiClient();
-                            client.setBasePath("http://localhost:8080/skiResort");
-                            //client.setBasePath("http://54.185.240.211:8080/skiResort_war");
-                            SkiersApi apiInstance = new SkiersApi(client);
                             LiftRide body = new LiftRide(); // skiers post request body: liftID, time
                             //for (int j = 0; j < requests; j++) {
 
@@ -62,14 +67,13 @@ public class SkiersApiApiExample {
                                         Integer.toString(ride.getDayID()), ride.getSkierID());
 
                                 countdownlatch.countDown();
-                                System.out.println("Thread " + Thread.currentThread().getId() + " completed successfully.");
+                                // System.out.println("Thread " + Thread.currentThread().getId() + " " + (j+1) + " times completed successfully.");
 
-                                requestsCount ++;
+                                //requestsCount ++;
 
                             } catch (ApiException e) {
                                 System.err.println("Exception when calling SkiersApi#POST request");
                                 unsuccessfulRequests.incrementAndGet();
-                                e.printStackTrace();
                             }
                             // }
 
@@ -94,23 +98,20 @@ public class SkiersApiApiExample {
             if (!t2) {
                 System.out.println("t2 shutdown problem");
             }
-            // Wait for all threads to terminate with a specified timeout 10000request :20sec
-            //boolean terminated = executorService.awaitTermination(20, TimeUnit.SECONDS);
-//            if (!terminated) {
-//                System.out.println("ExecutorService did not terminate within the specified timeout.");
-//            }
+
             if (!executorService.isTerminated()) {
                 System.out.println("Some threads in executorService did not terminate.");
             }
 
             long endTime = System.currentTimeMillis();
             long runTime = endTime - startTime;
+            double runTimeSecond = runTime / 1000.0;
 
             System.out.println("All threads completed their requests. Terminating threads.");
-            System.out.println("total requests: " + requests + ", successful requests: " + (requests - unsuccessfulRequests.get()));
-            System.out.println("total requests: " + requests + ", unsuccessful requests: " + unsuccessfulRequests.get());
-            System.out.println("Total run(wall)time: " + (endTime - startTime) + " milliseconds");
-            System.out.println("Total throughput in requests per second: " + ((requests) / (runTime / 1000.0)));
+            System.out.println("total requests: " + qSize + ", successful requests: " + (qSize  - unsuccessfulRequests.get()));
+            System.out.println("total requests: " + qSize + ", unsuccessful requests: " + unsuccessfulRequests.get());
+            System.out.println("Total run(wall)time: " + runTime + " milliseconds");
+            System.out.println("Total throughput in requests per second: " + (qSize / runTimeSecond));
 
         } catch (InterruptedException e) {
             e.printStackTrace();
