@@ -149,9 +149,9 @@ public class SkiersApiApiExample2 {
             List<Long> latencies = new ArrayList<>();
             BufferedReader br = new BufferedReader(new FileReader("output.csv"));
             String line;
-            int count = 0;
+            // int count = 0;
             long latencySum = 0;
-            while ((line = br.readLine()) != null && count != requests) {
+            while ((line = br.readLine()) != null) { // && count != requests
                 String[] values = line.split(",");
                 if (values.length >= 3) {
                     if (isParsableAsLong(values[2].trim())) {
@@ -160,7 +160,7 @@ public class SkiersApiApiExample2 {
                         latencySum += num;
                     }
                 }
-                count ++;
+                // count ++;
             }
 
             // median
@@ -176,9 +176,9 @@ public class SkiersApiApiExample2 {
             int index = (int) Math.floor(0.99 * n);
 
             System.out.println("All threads completed their requests. Terminating threads.");
-            System.out.println("mean response time (millisecs): " + latencySum / requests);
+            System.out.println("mean response time (millisecs): " + latencySum / qSize);
             System.out.println("median response time (millisecs): " + median );
-            System.out.println("Total throughput in requests per second: " + ((requests) / (runTime / 1000.0)));
+            System.out.println("Total throughput in requests per second: " + ((qSize) / (runTime / 1000.0)));
             System.out.println("p99 (99th percentile response time (millisecs)): " + latencies.get(index));
             System.out.println("min and max response time (millisecs): " + latencies.get(0) + " " + latencies.get(n - 1));
 
