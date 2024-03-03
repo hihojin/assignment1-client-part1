@@ -16,7 +16,7 @@ public class SkiersApiApiExample2 {
     private static final int TOTAL_THREADS = 100;
     private static final CountDownLatch countdownlatch = new CountDownLatch(TOTAL_THREADS);
     private static final int requests = 2000;
-    private static final int qSize = 200000;
+    private static final int qSize = TOTAL_THREADS * requests;
     private static final BlockingQueue<LiftRideEvent> q = new LinkedBlockingQueue<>(qSize);
 
     public static void main(String[] args) throws IOException {

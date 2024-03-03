@@ -8,18 +8,19 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class SkiersApiApiExample {
 
-    // Total requests = Number of threads × Requests per thread
+    // Total requests = Number of threads × Requests per thread == qsize
     //= 100 × 2000
     //= 200,000
 
     private static final int TOTAL_THREADS = 100;
     private static final CountDownLatch countdownlatch = new CountDownLatch(TOTAL_THREADS);
-    private static final int requests = 2000;
-    private static final int qSize = 200000;
+    private static final int requests = 100;
+    private static final int qSize = TOTAL_THREADS * requests;
     private static final BlockingQueue<LiftRideEvent> q = new LinkedBlockingQueue<>(qSize);
 
     public static void main(String[] args) {
         long startTime = System.currentTimeMillis();
+        System.out.println(startTime);
 
         // 1 thread: generating event objects, put them to q - producer
         ExecutorService generationService = Executors.newSingleThreadExecutor();
@@ -104,14 +105,14 @@ public class SkiersApiApiExample {
             }
 
             long endTime = System.currentTimeMillis();
+            System.out.println(endTime);
             long runTime = endTime - startTime;
-            double runTimeSecond = runTime / 1000.0;
 
             System.out.println("All threads completed their requests. Terminating threads.");
             System.out.println("total requests: " + qSize + ", successful requests: " + (qSize  - unsuccessfulRequests.get()));
             System.out.println("total requests: " + qSize + ", unsuccessful requests: " + unsuccessfulRequests.get());
             System.out.println("Total run(wall)time: " + runTime + " milliseconds");
-            System.out.println("Total throughput in requests per second: " + (qSize / runTimeSecond));
+            System.out.println("Total throughput in requests per second: " + (qSize / (runTime / 1000.0)));
 
         } catch (InterruptedException e) {
             e.printStackTrace();
