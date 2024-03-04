@@ -2,7 +2,8 @@ package part1;
 
 import io.swagger.client.*;
 import io.swagger.client.api.SkiersApi;
-import io.swagger.client.model.*;
+import io.swagger.client.model.LiftRide;
+
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -13,77 +14,85 @@ public class SkiersApiApiExample {
     //= 200,000
 
     private static final int TOTAL_THREADS = 100;
-    private static final CountDownLatch countdownlatch = new CountDownLatch(TOTAL_THREADS);
-    private static final int requests = 100;
+    private static final int requests = 2000;
+    private static final CountDownLatch countdownlatch = new CountDownLatch(TOTAL_THREADS * requests);
     private static final int qSize = TOTAL_THREADS * requests;
     private static final BlockingQueue<LiftRideEvent> q = new LinkedBlockingQueue<>(qSize);
 
     public static void main(String[] args) {
         long startTime = System.currentTimeMillis();
-        System.out.println(startTime);
 
         // 1 thread: generating event objects, put them to q - producer
         ExecutorService generationService = Executors.newSingleThreadExecutor();
-        generationService.submit(new Runnable() {
-            @Override
-            public void run() {
-                for (int i =0; i < qSize; i++) {
-                    LiftRideEvent ride = new LiftRideEvent(generateRandomNumber(1, 100000), generateRandomNumber(1, 10),
-                            generateRandomNumber(1, 40), generateRandomNumber(1, 360));
-                    try {
-                        q.put(ride);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-            }
-        });
+        generationService.submit(new EventGenerationThread(qSize, q));
 
         // 2 thread: making POST requests to server by taking event from q - consumer
+
+        // the number of threads that run concurrently
         ExecutorService executorService = Executors.newFixedThreadPool(TOTAL_THREADS);
         // shared variables across threads
         AtomicInteger unsuccessfulRequests = new AtomicInteger(0);
 
+        ApiClient client = new ApiClient();
+        client.setBasePath("http://localhost:8080/skiResort");
+        //client.setBasePath("http://54.185.240.211:8080/skiResort_war");
+        SkiersApi apiInstance = new SkiersApi(client);
+
         for (int i = 0; i < TOTAL_THREADS; i++) {
-            executorService.submit(new Runnable() {
-                @Override
-                public void run() {
+            for (int j = 0; j < requests; j++) {
+                try {
+                    LiftRideEvent ride = q.take();
+                    LiftRide body = new LiftRide(); // skiers post request body: liftID, time
 
-                    //int requestsCount = 0;
-                    ApiClient client = new ApiClient();
-                    client.setBasePath("http://localhost:8080/skiResort");
-                    //client.setBasePath("http://54.185.240.211:8080/skiResort_war");
-                    SkiersApi apiInstance = new SkiersApi(client);
-                    for (int j = 0; j < requests; j++) {
-                    //while (requestsCount < requests) {
-                        try {
-                            LiftRideEvent ride = q.take();
-                            LiftRide body = new LiftRide(); // skiers post request body: liftID, time
-                            //for (int j = 0; j < requests; j++) {
+                    body.setLiftID(ride.getLiftID());
+                    body.setTime(ride.getTime());
 
-                            body.setLiftID(ride.getLiftID());
-                            body.setTime(ride.getTime());
-                            try {
-                                ApiResponse<Void> response = apiInstance.writeNewLiftRideWithHttpInfo(body, ride.getResortID(), Integer.toString(ride.getSeasonID()),
-                                        Integer.toString(ride.getDayID()), ride.getSkierID());
-
-                                countdownlatch.countDown();
-                                // System.out.println("Thread " + Thread.currentThread().getId() + " " + (j+1) + " times completed successfully.");
-
-                                //requestsCount ++;
-
-                            } catch (ApiException e) {
-                                System.err.println("Exception when calling SkiersApi#POST request");
-                                unsuccessfulRequests.incrementAndGet();
-                            }
-                            // }
-
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
+                    executorService.submit(new SkiersAPI(apiInstance, unsuccessfulRequests, body, ride));
+                    countdownlatch.countDown();
                 }
-            });
+                catch (InterruptedException e) {
+                    System.out.println("error taking event from the queue");
+                }
+            }
+//            executorService.submit(new Runnable() {
+//                @Override
+//                public void run() {
+//
+//                    //int requestsCount = 0;
+//                    ApiClient client = new ApiClient();
+//                    client.setBasePath("http://localhost:8080/skiResort");
+//                    //client.setBasePath("http://54.185.240.211:8080/skiResort_war");
+//                    SkiersApi apiInstance = new SkiersApi(client);
+//                    for (int j = 0; j < requests; j++) {
+//                    //while (requestsCount < requests) {
+//                        try {
+//                            LiftRideEvent ride = q.take();
+//                            LiftRide body = new LiftRide(); // skiers post request body: liftID, time
+//                            //for (int j = 0; j < requests; j++) {
+//
+//                            body.setLiftID(ride.getLiftID());
+//                            body.setTime(ride.getTime());
+//                            try {
+//                                ApiResponse<Void> response = apiInstance.writeNewLiftRideWithHttpInfo(body, ride.getResortID(), Integer.toString(ride.getSeasonID()),
+//                                        Integer.toString(ride.getDayID()), ride.getSkierID());
+//
+//                                countdownlatch.countDown();
+//                                // System.out.println("Thread " + Thread.currentThread().getId() + " " + (j+1) + " times completed successfully.");
+//
+//                                //requestsCount ++;
+//
+//                            } catch (ApiException e) {
+//                                System.err.println("Exception when calling SkiersApi#POST request");
+//                                unsuccessfulRequests.incrementAndGet();
+//                            }
+//                            // }
+//
+//                        } catch (InterruptedException e) {
+//                            throw new RuntimeException(e);
+//                        }
+//                    }
+//                }
+//            });
         }
 
         try {
@@ -105,7 +114,6 @@ public class SkiersApiApiExample {
             }
 
             long endTime = System.currentTimeMillis();
-            System.out.println(endTime);
             long runTime = endTime - startTime;
 
             System.out.println("All threads completed their requests. Terminating threads.");
@@ -115,12 +123,12 @@ public class SkiersApiApiExample {
             System.out.println("Total throughput in requests per second: " + (qSize / (runTime / 1000.0)));
 
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            System.out.println("something went wrong in try block");
         }
     }
 
-    private static int generateRandomNumber(int min, int max) {
-        int random_int = (int) Math.floor(Math.random() * (max - min + 1) + min);
-        return random_int;
-    }
+//    private static int generateRandomNumber(int min, int max) {
+//        int random_int = (int) Math.floor(Math.random() * (max - min + 1) + min);
+//        return random_int;
+//    }
 }
