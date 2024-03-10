@@ -44,6 +44,7 @@ public class SkiersAPI implements Runnable{
                 } catch (ApiException e) {
                     System.err.println("Exception when calling SkiersApi#POST request");
                     this.unsuccessfulRequests.incrementAndGet();
+                    e.printStackTrace();
                 }
 //            } catch (InterruptedException e) {
 //                throw new RuntimeException(e);
