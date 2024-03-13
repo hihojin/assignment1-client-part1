@@ -19,7 +19,7 @@ public class SkiersApiApiExample {
     private static final int qSize = TOTAL_THREADS * requests;
     private static final BlockingQueue<LiftRideEvent> q = new LinkedBlockingQueue<>(qSize);
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         long startTime = System.currentTimeMillis();
 
         // 1 thread: generating event objects, put them to q - producer
@@ -27,33 +27,40 @@ public class SkiersApiApiExample {
         generationService.submit(new EventGenerationThread(qSize, q));
 
         // 2 thread: making POST requests to server by taking event from q - consumer
-
-        // the number of threads that run concurrently
         ExecutorService executorService = Executors.newFixedThreadPool(TOTAL_THREADS);
         // shared variables across threads
         AtomicInteger unsuccessfulRequests = new AtomicInteger(0);
 
-        ApiClient client = new ApiClient();
-        client.setBasePath("http://localhost:8080/Assignment2SkierServer_war_exploded");
+        ApiClientPool clientPool = new ApiClientPool(TOTAL_THREADS, "http://localhost:8080/Assignment2SkierServer_war_exploded");
         //client.setBasePath("http://54.185.240.211:8080/skiResort_war");
-        SkiersApi apiInstance = new SkiersApi(client);
 
         for (int i = 0; i < TOTAL_THREADS; i++) {
-            for (int j = 0; j < requests; j++) {
+            executorService.submit(() -> {
                 try {
-                    LiftRideEvent ride = q.take();
-                    LiftRide body = new LiftRide(); // skiers post request body: liftID, time
+                    ApiClient client = clientPool.borrowClient();
+                    SkiersApi apiInstance = new SkiersApi(client);
 
-                    body.setLiftID(ride.getLiftID());
-                    body.setTime(ride.getTime());
+                    for (int j = 0; j < requests; j++) { // requests per thread
+                        try {
+                            LiftRideEvent ride = q.take();
+                            LiftRide body = new LiftRide(); // skiers post request body: liftID, time
 
-                    executorService.submit(new SkiersAPI(apiInstance, unsuccessfulRequests, body, ride));
-                    countdownlatch.countDown();
+                            body.setLiftID(ride.getLiftID());
+                            body.setTime(ride.getTime());
+
+                            ApiResponse<Void> response = apiInstance.writeNewLiftRideWithHttpInfo(body, ride.getResortID(), Integer.toString(ride.getSeasonID()),
+                                    Integer.toString(ride.getDayID()), ride.getSkierID());
+                            countdownlatch.countDown();
+                        } catch (InterruptedException | ApiException e) {
+                            System.err.println("Exception when calling SkiersApi#POST request");
+                            unsuccessfulRequests.incrementAndGet();
+                        }
+                    }
+                    clientPool.returnClient(client);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
                 }
-                catch (InterruptedException e) {
-                    System.out.println("error taking event from the queue");
-                }
-            }
+            });
 //            executorService.submit(new Runnable() {
 //                @Override
 //                public void run() {
