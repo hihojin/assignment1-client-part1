@@ -82,7 +82,7 @@ public class SkiersApiApiExample2 {
                 public void run() {
 
                     ApiClient client = new ApiClient();
-                    client.setBasePath("http://localhost:8080/skiResort");
+                    client.setBasePath("http://localhost:8080/Assignment2SkierServer_war_exploded");
                     //client.setBasePath("http://54.185.240.211:8080/skiResort_war");
                     SkiersApi apiInstance = new SkiersApi(client);
 

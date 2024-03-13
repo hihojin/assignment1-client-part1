@@ -13,8 +13,8 @@ public class SkiersApiApiExample {
     //= 100 × 2000
     //= 200,000
 
-    private static final int TOTAL_THREADS = 1; // 100
-    private static final int requests = 5; // 2000
+    private static final int TOTAL_THREADS = 100; // 100
+    private static final int requests = 2000; // 2000
     private static final CountDownLatch countdownlatch = new CountDownLatch(TOTAL_THREADS * requests);
     private static final int qSize = TOTAL_THREADS * requests;
     private static final BlockingQueue<LiftRideEvent> q = new LinkedBlockingQueue<>(qSize);
@@ -34,7 +34,7 @@ public class SkiersApiApiExample {
         AtomicInteger unsuccessfulRequests = new AtomicInteger(0);
 
         ApiClient client = new ApiClient();
-        client.setBasePath("http://localhost:8080/skiResort");
+        client.setBasePath("http://localhost:8080/Assignment2SkierServer_war_exploded");
         //client.setBasePath("http://54.185.240.211:8080/skiResort_war");
         SkiersApi apiInstance = new SkiersApi(client);
 
@@ -99,9 +99,9 @@ public class SkiersApiApiExample {
             // Wait for all threads to complete their requests
             countdownlatch.await();
             generationService.shutdown();
-            boolean t1 = generationService.awaitTermination(20, TimeUnit.SECONDS);
+            boolean t1 = generationService.awaitTermination(3000, TimeUnit.SECONDS);
             executorService.shutdown();
-            boolean t2 = executorService.awaitTermination(20, TimeUnit.SECONDS);
+            boolean t2 = executorService.awaitTermination(3000, TimeUnit.SECONDS);
             if (!t1) {
                 System.out.println("t1 shutdown problem");
             }
