@@ -5,9 +5,9 @@ import io.swagger.client.ApiException;
 import io.swagger.client.ApiResponse;
 import io.swagger.client.api.SkiersApi;
 import io.swagger.client.model.LiftRide;
+import part1.ApiClientPool;
 import part1.EventGenerationThread;
 import part1.LiftRideEvent;
-import part1.SkiersAPI;
 
 import java.io.*;
 import java.util.*;
@@ -21,7 +21,7 @@ public class SkiersApiApiExample2 {
     private static final int qSize = TOTAL_THREADS * requests;
     private static final BlockingQueue<LiftRideEvent> q = new LinkedBlockingQueue<>(qSize);
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InterruptedException {
         long startTime = System.currentTimeMillis();
 
         // 1 thread: generating event objects, put them to q - producer
@@ -34,108 +34,56 @@ public class SkiersApiApiExample2 {
         AtomicInteger unsuccessfulRequests = new AtomicInteger(0);
 
         FileWriter writer = new FileWriter("output.csv");
-
-        ApiClient client = new ApiClient();
-        client.setBasePath("http://localhost:8080/skiResort");
-        //client.setBasePath("http://54.185.240.211:8080/skiResort_war");
-        SkiersApi apiInstance = new SkiersApi(client);
+        ApiClientPool clientPool = new ApiClientPool(TOTAL_THREADS);
 
         for (int i = 0; i < TOTAL_THREADS; i++) {
-            // this part is commented out for possible further ood optimization
-//            for (int j = 0; j < requests; j++) {
-//                try {
-//                    LiftRideEvent ride = q.take();
-//                    LiftRide body = new LiftRide();
-//
-//                    body.setLiftID(ride.getLiftID());
-//                    body.setTime(ride.getTime());
-//
-//                    // take time before calling api
-//                    long eachRequestStartTime = System.currentTimeMillis();
-//                    System.out.println(eachRequestStartTime);
-//                    SkiersAPI api = new SkiersAPI(apiInstance, unsuccessfulRequests, body, ride);
-//                    executorService.submit(api);
-//                    int statusCode = api.getLastStatusCode();
-//
-//                    long eachRequestEndTime = System.currentTimeMillis();
-//                    System.out.println(eachRequestEndTime);
-//                    long latency = eachRequestEndTime - eachRequestStartTime;
-//
-//                    synchronized (writer) {
-//                        writer.append(String.valueOf(eachRequestStartTime))
-//                                .append(",")
-//                                .append("POST")
-//                                .append(",")
-//                                .append(String.valueOf(latency)) // milliseconds
-//                                .append(",")
-//                                .append(String.valueOf(statusCode))
-//                                .append("\n");
-//                    }
-//
-//                    countdownlatch.countDown();
-//
-//                } catch (InterruptedException e) {
-//                    System.out.println("error taking event from the queue");
-//                }
-            executorService.submit(new Runnable() {
-                @Override
-                public void run() {
+            executorService.submit(() -> {
+                try {
+                    SkiersApi client = clientPool.borrowClient();
+                    // client.setBasePath("http://localhost:8080/Assignment2SkierServer_war_exploded");
 
-                    ApiClient client = new ApiClient();
-                    client.setBasePath("http://localhost:8080/Assignment2SkierServer_war_exploded");
-                    //client.setBasePath("http://54.185.240.211:8080/skiResort_war");
-                    SkiersApi apiInstance = new SkiersApi(client);
-
-                    for (int j = 0; j < requests; j++) {
+                    for (int j = 0; j < requests; j++) { // requests per thread
                         try {
                             LiftRideEvent ride = q.take();
                             LiftRide body = new LiftRide();
 
-                            //for (int j = 0; j < requests; j++) {
-                                //int retries = 0;
-                                //boolean success = false;
-                                //while (retries < 5 && !success) {
                             body.setLiftID(ride.getLiftID());
                             body.setTime(ride.getTime());
 
-                            try {
-                                long eachRequestStartTime = System.currentTimeMillis();
+                            long eachRequestStartTime = System.currentTimeMillis();
 
-                                ApiResponse<Void> response = apiInstance.writeNewLiftRideWithHttpInfo(body, ride.getResortID(), Integer.toString(ride.getSeasonID()),
-                                        Integer.toString(ride.getDayID()), ride.getSkierID());
-                                int statusCode = response.getStatusCode();
+                            ApiResponse<Void> response = client.writeNewLiftRideWithHttpInfo(body, ride.getResortID(), Integer.toString(ride.getSeasonID()),
+                                    Integer.toString(ride.getDayID()), ride.getSkierID());
+                            int statusCode = response.getStatusCode();
 
-                                long eachRequestEndTime = System.currentTimeMillis();
+                            long eachRequestEndTime = System.currentTimeMillis();
 
-                                long latency = eachRequestEndTime - eachRequestStartTime;
+                            long latency = eachRequestEndTime - eachRequestStartTime;
 
-                                synchronized (writer) {
-                                    writer.append(String.valueOf(eachRequestStartTime))
-                                            .append(",")
-                                            .append("POST")
-                                            .append(",")
-                                            .append(String.valueOf(latency)) // milliseconds
-                                            .append(",")
-                                            .append(String.valueOf(statusCode))
-                                            .append("\n");
-                                }
-
-                                countdownlatch.countDown();
-//                              System.out.println("Thread " + Thread.currentThread().getId() +
-//                              " - Request " + (j + 1) + " completed successfully.");
-
-                            } catch (ApiException e) {
-                                System.err.println("Exception when calling SkiersApi#POST request");
-                                //retries ++;
-//                              if (retries == 5) {
-//                                 unsuccessfulRequests.incrementAndGet();
-//                                 break;
-//                              }
+                            synchronized (writer) {
+                                writer.append(String.valueOf(eachRequestStartTime))
+                                        .append(",")
+                                        .append("POST")
+                                        .append(",")
+                                        .append(String.valueOf(latency)) // milliseconds
+                                        .append(",")
+                                        .append(String.valueOf(statusCode))
+                                        .append("\n");
                             }
-                            } catch(InterruptedException | IOException e){
-                                throw new RuntimeException(e);
-                            }
+
+                            countdownlatch.countDown();
+
+                        } catch (InterruptedException | ApiException e) {
+                            System.err.println("Exception when calling SkiersApi#POST request");
+                            unsuccessfulRequests.incrementAndGet();
+                        } catch (IOException e) {
+                            System.out.println("exception when writing to .csv");
+                        }
                     }
+                    clientPool.returnClient(client);
+                }
+                catch (InterruptedException e) {
+                    throw new RuntimeException(e);
                 }
             });
         }
@@ -144,9 +92,9 @@ public class SkiersApiApiExample2 {
             // Wait for all threads to complete their requests
             countdownlatch.await();
             generationService.shutdown();
-            boolean t1 = generationService.awaitTermination(20, TimeUnit.SECONDS);
+            boolean t1 = generationService.awaitTermination(3000, TimeUnit.SECONDS);
             executorService.shutdown();
-            boolean t2 = executorService.awaitTermination(20, TimeUnit.SECONDS);
+            boolean t2 = executorService.awaitTermination(3000, TimeUnit.SECONDS);
 
             try {
                 writer.close();
@@ -172,7 +120,7 @@ public class SkiersApiApiExample2 {
             List<Long> latencies = new ArrayList<>();
             BufferedReader br = new BufferedReader(new FileReader("output.csv"));
             String line;
-            // int count = 0;
+
             long latencySum = 0;
             while ((line = br.readLine()) != null) { // && count != requests
                 String[] values = line.split(",");
@@ -183,7 +131,6 @@ public class SkiersApiApiExample2 {
                         latencySum += num;
                     }
                 }
-                // count ++;
             }
 
             // median

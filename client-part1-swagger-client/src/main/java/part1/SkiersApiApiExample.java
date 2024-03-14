@@ -13,8 +13,8 @@ public class SkiersApiApiExample {
     //= 100 × 2000
     //= 200,000
 
-    private static final int TOTAL_THREADS = 100; // 100
-    private static final int requests = 2000; // 2000
+    private static final int TOTAL_THREADS = 100;
+    private static final int requests = 2000;
     private static final CountDownLatch countdownlatch = new CountDownLatch(TOTAL_THREADS * requests);
     private static final int qSize = TOTAL_THREADS * requests;
     private static final BlockingQueue<LiftRideEvent> q = new LinkedBlockingQueue<>(qSize);
@@ -31,14 +31,13 @@ public class SkiersApiApiExample {
         // shared variables across threads
         AtomicInteger unsuccessfulRequests = new AtomicInteger(0);
 
-        ApiClientPool clientPool = new ApiClientPool(TOTAL_THREADS, "http://localhost:8080/Assignment2SkierServer_war_exploded");
-        //client.setBasePath("http://54.185.240.211:8080/skiResort_war");
+        ApiClientPool clientPool = new ApiClientPool(TOTAL_THREADS);
 
         for (int i = 0; i < TOTAL_THREADS; i++) {
             executorService.submit(() -> {
                 try {
-                    ApiClient client = clientPool.borrowClient();
-                    SkiersApi apiInstance = new SkiersApi(client);
+                    SkiersApi client = clientPool.borrowClient();
+                    // client.setBasePath("http://localhost:8080/Assignment2SkierServer_war_exploded");
 
                     for (int j = 0; j < requests; j++) { // requests per thread
                         try {
@@ -48,7 +47,7 @@ public class SkiersApiApiExample {
                             body.setLiftID(ride.getLiftID());
                             body.setTime(ride.getTime());
 
-                            ApiResponse<Void> response = apiInstance.writeNewLiftRideWithHttpInfo(body, ride.getResortID(), Integer.toString(ride.getSeasonID()),
+                            client.writeNewLiftRideWithHttpInfo(body, ride.getResortID(), Integer.toString(ride.getSeasonID()),
                                     Integer.toString(ride.getDayID()), ride.getSkierID());
                             countdownlatch.countDown();
                         } catch (InterruptedException | ApiException e) {
@@ -61,45 +60,6 @@ public class SkiersApiApiExample {
                     throw new RuntimeException(e);
                 }
             });
-//            executorService.submit(new Runnable() {
-//                @Override
-//                public void run() {
-//
-//                    //int requestsCount = 0;
-//                    ApiClient client = new ApiClient();
-//                    client.setBasePath("http://localhost:8080/skiResort");
-//                    //client.setBasePath("http://54.185.240.211:8080/skiResort_war");
-//                    SkiersApi apiInstance = new SkiersApi(client);
-//                    for (int j = 0; j < requests; j++) {
-//                    //while (requestsCount < requests) {
-//                        try {
-//                            LiftRideEvent ride = q.take();
-//                            LiftRide body = new LiftRide(); // skiers post request body: liftID, time
-//                            //for (int j = 0; j < requests; j++) {
-//
-//                            body.setLiftID(ride.getLiftID());
-//                            body.setTime(ride.getTime());
-//                            try {
-//                                ApiResponse<Void> response = apiInstance.writeNewLiftRideWithHttpInfo(body, ride.getResortID(), Integer.toString(ride.getSeasonID()),
-//                                        Integer.toString(ride.getDayID()), ride.getSkierID());
-//
-//                                countdownlatch.countDown();
-//                                // System.out.println("Thread " + Thread.currentThread().getId() + " " + (j+1) + " times completed successfully.");
-//
-//                                //requestsCount ++;
-//
-//                            } catch (ApiException e) {
-//                                System.err.println("Exception when calling SkiersApi#POST request");
-//                                unsuccessfulRequests.incrementAndGet();
-//                            }
-//                            // }
-//
-//                        } catch (InterruptedException e) {
-//                            throw new RuntimeException(e);
-//                        }
-//                    }
-//                }
-//            });
         }
 
         try {
@@ -133,9 +93,4 @@ public class SkiersApiApiExample {
             System.out.println("something went wrong in try block");
         }
     }
-
-//    private static int generateRandomNumber(int min, int max) {
-//        int random_int = (int) Math.floor(Math.random() * (max - min + 1) + min);
-//        return random_int;
-//    }
 }
